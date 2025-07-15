@@ -122,7 +122,7 @@ export default function OrderPage() {
       {/* Category Navigation */}
       <div className="bg-white border-b sticky top-16 z-30">
         <div className="px-4 py-3">
-          <div className="flex space-x-6 overflow-x-auto">
+          <div className="flex space-x-6 overflow-x-auto scrollbar-hide">
             {categories.map(category => (
               <Button
                 key={category}
