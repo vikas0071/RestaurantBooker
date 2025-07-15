@@ -1,0 +1,54 @@
+Create a full-stack web application for a restaurant table ordering system with the following features:
+
+🔹 GENERAL OVERVIEW:
+- When a customer scans a QR code on a table, they are directed to a specific web URL like: `/order?table=5`
+- The customer sees the full menu, selects items, and places an order linked to that table.
+- The restaurant staff (admin dashboard) gets notified instantly of the order with the table number and items ordered.
+- The dashboard allows marking order statuses (e.g., Preparing, Served).
+
+🔹 TECH STACK:
+- Frontend: React (create-react-app or Vite)
+- Backend: Node.js + Express.js
+- Realtime Notifications: Socket.IO (WebSocket)
+- Database: MongoDB (use mongoose)
+- Hosting ready for Replit (single monorepo with backend and frontend)
+- QR code links are not generated in-app, but the table number is passed via URL
+
+🔹 FRONTEND FEATURES (React):
+- `/order?table=ID`: 
+  - Read table ID from URL
+  - Fetch menu from API (`GET /api/menu`)
+  - Display menu grouped by category
+  - Add items to cart with quantity and optional note
+  - Submit order (`POST /api/order`)
+  - After placing order, show confirmation with order ID
+
+- `/admin`:
+  - Show all new orders in real-time (via Socket.IO)
+  - Display table number, items, time
+  - Buttons to update status: Pending → Preparing → Served
+
+🔹 BACKEND FEATURES (Node.js + Express):
+- `/api/menu [GET]` – return list of menu items from MongoDB
+- `/api/order [POST]` – accepts order data: table ID, items, notes → save to DB → emit to staff via Socket.IO
+- `/api/orders [GET]` – for admin to list all orders
+
+🔹 DATABASE SCHEMA (Mongoose):
+MenuItem: name, category, price, isAvailable
+Order: tableId, items [{name, quantity, note}], status, createdAt
+
+🔹 SOCKET.IO:
+- Emit `new-order` when customer places an order
+- Admin dashboard listens to `new-order` and shows new order in real-time
+
+🔹 UI:
+- Mobile responsive, clean modern layout
+- Customer view: Restaurant branding, large buttons for easy use
+- Admin dashboard: List with filters (e.g., by status), update status buttons
+
+🔹 EXTRA:
+- Seed some demo menu items in DB
+- Add CORS, .env config, MongoDB connection setup
+- Provide README with setup instructions for Replit
+
+Goal: A working full-stack system where customer can place table-wise orders from mobile browser by scanning QR code, and admin sees the order in real-time.
