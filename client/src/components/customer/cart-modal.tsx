@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Minus, Plus, X, Check, IndianRupee, Loader2, Clock, User, Phone } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface CartItem {
   id: number;
@@ -99,7 +100,7 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
   if (isSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="centered-modal animate-fade-in">
           <div className="text-center py-6">
             <div className="w-16 h-16 bg-accent bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-accent" />
@@ -123,7 +124,12 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-hidden">
+      <DialogContent className="centered-modal max-h-[80vh] overflow-hidden relative">
+        {orderMutation.isPending && (
+          <div className="absolute top-0 left-0 w-full z-50">
+            <Progress value={80} />
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle>Your Order</DialogTitle>
         </DialogHeader>

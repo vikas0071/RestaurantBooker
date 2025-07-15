@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { UtensilsCrossed, Clock, IndianRupee, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface CartItem {
   id: number;
@@ -177,13 +178,13 @@ export default function OrderPage() {
             ))}
           </div>
         ) : (
-          Object.entries(groupedMenu).map(([category, items]) => (
-            <div key={category} className="category-section">
+          activeCategory && groupedMenu[activeCategory] ? (
+            <div key={activeCategory} className="category-section">
               <h2 className="text-lg font-semibold text-secondary mb-4">
-                {category.charAt(0).toUpperCase() + category.slice(1)}
+                {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}
               </h2>
               <div className="space-y-4">
-                {items.map(item => (
+                {groupedMenu[activeCategory].map(item => (
                   <MenuItemComponent
                     key={item.id}
                     item={item}
@@ -192,7 +193,7 @@ export default function OrderPage() {
                 ))}
               </div>
             </div>
-          ))
+          ) : null
         )}
       </div>
 
@@ -213,6 +214,13 @@ export default function OrderPage() {
         onUpdateQuantity={updateCartItemQuantity}
         tableNumber={tableNumber}
       />
+
+      {/* Progress Bar for Menu Loading */}
+      {isLoading && (
+        <div className="fixed top-0 left-0 w-full z-50">
+          <Progress value={60} />
+        </div>
+      )}
     </div>
   );
 }
