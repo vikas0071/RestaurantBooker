@@ -1,6 +1,21 @@
-import { menuItems, orders, users, tables, type MenuItem, type Order, type InsertMenuItem, type InsertOrder, type User, type InsertUser, type Table, type InsertTable } from "@shared/schema";
-import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
+import {
+  users,
+  menuItems,
+  orders,
+  tables
+} from "../shared/schema.ts";
+import type {
+  MenuItem,
+  InsertMenuItem,
+  Order,
+  InsertOrder,
+  User,
+  InsertUser,
+  Table,
+  InsertTable
+} from "../shared/schema.ts";
+import { db } from "./db.ts";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;

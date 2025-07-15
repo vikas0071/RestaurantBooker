@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage";
-import { insertOrderSchema } from "@shared/schema";
+import { storage } from "./storage.ts";
+import { insertOrderSchema } from "../shared/schema.ts";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
