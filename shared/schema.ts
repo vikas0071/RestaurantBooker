@@ -10,6 +10,11 @@ export const menuItems = pgTable("menu_items", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
   isAvailable: boolean("is_available").notNull().default(true),
+  image: text("image"),
+  preparationTime: integer("preparation_time").default(15), // in minutes
+  isVegetarian: boolean("is_vegetarian").default(false),
+  isSpicy: boolean("is_spicy").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const orders = pgTable("orders", {
@@ -19,7 +24,11 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   status: text("status").notNull().default("pending"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  customerName: text("customer_name"),
+  customerPhone: text("customer_phone"),
+  estimatedTime: integer("estimated_time").default(30), // in minutes
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({
@@ -40,12 +49,36 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").notNull().default("admin"),
+  restaurantName: text("restaurant_name"),
+  email: text("email"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const tables = pgTable("tables", {
+  id: serial("id").primaryKey(),
+  number: integer("number").notNull().unique(),
+  capacity: integer("capacity").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  qrCode: text("qr_code").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  restaurantName: true,
+  email: true,
+  phone: true,
+});
+
+export const insertTableSchema = createInsertSchema(tables).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type Table = typeof tables.$inferSelect;
+export type InsertTable = z.infer<typeof insertTableSchema>;

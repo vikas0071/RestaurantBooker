@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, IndianRupee } from "lucide-react";
 
 interface FloatingCartProps {
   itemCount: number;
@@ -16,8 +16,9 @@ export default function FloatingCart({ itemCount, total, onOpenCart }: FloatingC
           <Badge className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium">
             {itemCount}
           </Badge>
-          <span className="font-medium text-secondary">
-            ${total.toFixed(2)}
+          <span className="font-medium text-secondary flex items-center">
+            <IndianRupee className="w-4 h-4 mr-1" />
+            {total.toFixed(0)}
           </span>
         </div>
         <Button

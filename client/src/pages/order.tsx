@@ -7,7 +7,8 @@ import CartModal from "@/components/customer/cart-modal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UtensilsCrossed } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { UtensilsCrossed, Clock, IndianRupee, Loader2 } from "lucide-react";
 
 interface CartItem {
   id: number;
@@ -84,15 +85,23 @@ export default function OrderPage() {
 
   if (!tableNumber) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md mx-4">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5">
+        <Card className="w-full max-w-md mx-4 shadow-xl animate-in fade-in duration-700">
           <CardContent className="pt-6">
             <div className="text-center">
-              <UtensilsCrossed className="h-12 w-12 text-primary mx-auto mb-4" />
-              <h1 className="text-xl font-bold text-secondary mb-2">Invalid Table</h1>
-              <p className="text-gray-600">
+              <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                <UtensilsCrossed className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-secondary mb-2">Table Access Required</h1>
+              <p className="text-gray-600 mb-4">
                 Please scan the QR code at your table to place an order.
               </p>
+              <a 
+                href="/" 
+                className="inline-block bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Go Back
+              </a>
             </div>
           </CardContent>
         </Card>
@@ -103,17 +112,23 @@ export default function OrderPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-40">
+      <header className="bg-white shadow-sm sticky top-0 z-40 animate-in slide-in-from-top duration-300">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-secondary">Bella Vista</h1>
+              <h1 className="text-xl font-bold text-secondary">Spice Garden</h1>
               <p className="text-sm text-gray-600">
                 Table <span className="font-medium text-primary">{tableNumber}</span>
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <UtensilsCrossed className="text-primary text-lg" />
+              <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
+                <Clock className="w-3 h-3 mr-1" />
+                Live Menu
+              </Badge>
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                <UtensilsCrossed className="w-4 h-4 text-white" />
+              </div>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Utensils, Check, CheckCircle } from "lucide-react";
+import { Utensils, Check, CheckCircle, IndianRupee } from "lucide-react";
 
 interface OrderCardProps {
   order: Order;
@@ -92,8 +92,9 @@ export default function OrderCard({ order }: OrderCardProps) {
           <div className="pt-2 border-t border-gray-100">
             <div className="flex justify-between items-center">
               <span className="font-medium text-secondary">Total</span>
-              <span className="font-semibold text-primary">
-                ${parseFloat(order.total).toFixed(2)}
+              <span className="font-semibold text-primary flex items-center">
+                <IndianRupee className="w-4 h-4 mr-1" />
+                {parseFloat(order.total).toFixed(0)}
               </span>
             </div>
           </div>

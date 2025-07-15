@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Minus, Plus, X, Check } from "lucide-react";
+import { Minus, Plus, X, Check, IndianRupee, Loader2, Clock, User, Phone } from "lucide-react";
 
 interface CartItem {
   id: number;
@@ -131,17 +131,20 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
         <div className="max-h-96 overflow-y-auto">
           <div className="space-y-4">
             {cart.map((item) => (
-              <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100">
+              <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <div className="flex-1">
                   <h3 className="font-medium text-secondary">{item.name}</h3>
-                  <p className="text-sm text-gray-600">${item.price.toFixed(2)}</p>
+                  <p className="text-sm text-gray-600 flex items-center">
+                    <IndianRupee className="w-3 h-3 mr-1" />
+                    {item.price.toFixed(0)}
+                  </p>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                    className="w-8 h-8 p-0 rounded-full"
+                    className="w-8 h-8 p-0 rounded-full hover:bg-red-50 hover:border-red-200"
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
@@ -150,7 +153,7 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
                     variant="outline"
                     size="sm"
                     onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                    className="w-8 h-8 p-0 rounded-full"
+                    className="w-8 h-8 p-0 rounded-full hover:bg-green-50 hover:border-green-200"
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
@@ -162,15 +165,24 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">${getSubtotal().toFixed(2)}</span>
+              <span className="font-medium flex items-center">
+                <IndianRupee className="w-3 h-3 mr-1" />
+                {getSubtotal().toFixed(0)}
+              </span>
             </div>
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600">Tax</span>
-              <span className="font-medium">${getTax().toFixed(2)}</span>
+              <span className="font-medium flex items-center">
+                <IndianRupee className="w-3 h-3 mr-1" />
+                {getTax().toFixed(0)}
+              </span>
             </div>
             <div className="flex justify-between items-center text-lg font-semibold">
               <span className="text-secondary">Total</span>
-              <span className="text-primary">${getTotal().toFixed(2)}</span>
+              <span className="text-primary flex items-center">
+                <IndianRupee className="w-4 h-4 mr-1" />
+                {getTotal().toFixed(0)}
+              </span>
             </div>
           </div>
 
