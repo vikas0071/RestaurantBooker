@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Order } from "@shared/schema";
+import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import OrderCard from "@/components/admin/order-card";
 import MenuManagement from "@/components/admin/menu-management";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Settings, LogOut, ShoppingBag, UtensilsCrossed, Users, IndianRupee, Clock } from "lucide-react";
 import { useSocket } from "@/hooks/use-socket";
+import { useLocation } from "wouter";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function AdminPage() {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -22,27 +24,44 @@ export default function AdminPage() {
   const [, navigate] = useLocation();
   
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (!userData) {
-      navigate("/login");
-      return;
-    }
-    setUser(JSON.parse(userData));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null);
+        navigate("/login");
+      } else {
+        // Always fetch latest admin info from Firestore
+        const adminDoc = await getDoc(doc(db, "admins", firebaseUser.uid));
+        if (adminDoc.exists()) {
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            restaurantName: adminDoc.data().restaurantName,
+          });
+        } else {
+          setUser(null);
+        }
+      }
+    });
+    return () => unsubscribe();
   }, [navigate]);
 
-  const { data: orders, isLoading, refetch } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-  });
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Set up WebSocket connection for real-time updates
-  useSocket((data) => {
-    if (data.type === 'new-order' || data.type === 'order-update') {
-      refetch();
-    }
-  });
+  useEffect(() => {
+    if (!user?.uid) return;
+    setIsLoading(true);
+    const q = query(collection(db, "orders"), where("adminId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    signOut(auth);
     navigate("/login");
   };
 

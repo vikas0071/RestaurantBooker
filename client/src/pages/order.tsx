@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { MenuItem } from "@shared/schema";
 import MenuItemComponent from "@/components/customer/menu-item";
 import FloatingCart from "@/components/customer/floating-cart";
@@ -25,9 +26,41 @@ export default function OrderPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("appetizers");
 
-  const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu"],
-  });
+  const [menuItems, setMenuItems] = useState<MenuItem[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tableAdminId, setTableAdminId] = useState<string | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchMenuAndAdmin() {
+      setIsLoading(true);
+      setTableError(null);
+      // Get table number from URL
+      const params = new URLSearchParams(window.location.search);
+      const tableNumber = params.get("table");
+      if (!tableNumber) {
+        setTableError("No table number specified.");
+        setIsLoading(false);
+        return;
+      }
+      // Fetch table info
+      const tableSnap = await getDoc(doc(db, "tables", tableNumber));
+      if (!tableSnap.exists()) {
+        setTableError("Table not found.");
+        setIsLoading(false);
+        return;
+      }
+      const tableData = tableSnap.data();
+      const adminId = tableData.adminId;
+      setTableAdminId(adminId);
+      // Fetch menu items for this admin
+      const q = query(collection(db, "menuItems"), where("adminId", "==", adminId));
+      const snapshot = await getDocs(q);
+      setMenuItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem)));
+      setIsLoading(false);
+    }
+    fetchMenuAndAdmin();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -84,7 +117,7 @@ export default function OrderPage() {
     return cart.reduce((count, item) => count + item.quantity, 0);
   };
 
-  if (!tableNumber) {
+  if (tableError) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-accent/5">
         <Card className="w-full max-w-md mx-4 shadow-xl animate-in fade-in duration-700">
@@ -93,10 +126,7 @@ export default function OrderPage() {
               <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
                 <UtensilsCrossed className="h-8 w-8 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-secondary mb-2">Table Access Required</h1>
-              <p className="text-gray-600 mb-4">
-                Please scan the QR code at your table to place an order.
-              </p>
+              <h1 className="text-xl font-bold text-secondary mb-2">{tableError}</h1>
               <a 
                 href="/" 
                 className="inline-block bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"

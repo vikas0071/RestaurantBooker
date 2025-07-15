@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,44 +11,49 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, UtensilsCrossed, Lock, User } from "lucide-react";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/login", credentials);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      localStorage.setItem("user", JSON.stringify(data.user));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: "Required fields",
+        description: "Please enter both email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const adminDoc = await getDoc(doc(db, "admins", userCred.user.uid));
+      if (!adminDoc.exists()) {
+        throw new Error("No admin profile found for this user.");
+      }
+      const adminData = adminDoc.data();
+      localStorage.setItem("user", JSON.stringify({
+        uid: userCred.user.uid,
+        email: userCred.user.email,
+        restaurantName: adminData.restaurantName,
+      }));
       toast({
         title: "Login successful!",
-        description: `Welcome back, ${data.user.username}!`,
+        description: `Welcome back, ${adminData.restaurantName}!`,
       });
       navigate("/admin");
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "Login failed",
         description: error.message || "Invalid credentials",
         variant: "destructive",
       });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || !password) {
-      toast({
-        title: "Required fields",
-        description: "Please enter both username and password",
-        variant: "destructive",
-      });
-      return;
+    } finally {
+      setLoading(false);
     }
-    loginMutation.mutate({ username, password });
   };
 
   return (
@@ -66,19 +72,19 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-medium">
-                  Username
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                   <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="pl-10 h-12"
-                    placeholder="Enter your username"
-                    disabled={loginMutation.isPending}
+                    placeholder="Enter your email"
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -95,16 +101,16 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 h-12"
                     placeholder="Enter your password"
-                    disabled={loginMutation.isPending}
+                    disabled={loading}
                   />
                 </div>
               </div>
               <Button
                 type="submit"
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-medium"
-                disabled={loginMutation.isPending}
+                disabled={loading}
               >
-                {loginMutation.isPending ? (
+                {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Signing in...
@@ -115,10 +121,7 @@ export default function LoginPage() {
               </Button>
             </form>
             <div className="mt-6 text-center text-sm text-gray-600">
-              <p>Demo credentials:</p>
-              <p className="font-mono bg-gray-100 px-2 py-1 rounded mt-1">
-                Username: admin | Password: admin123
-              </p>
+              <a href="/register" className="text-primary underline">Don't have an account? Register</a>
             </div>
           </CardContent>
         </Card>

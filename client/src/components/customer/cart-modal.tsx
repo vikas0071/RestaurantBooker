@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,13 +36,13 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
 
   const orderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const response = await apiRequest("POST", "/api/order", orderData);
-      return response.json();
+      // Add order to Firestore
+      const docRef = await addDoc(collection(db, "orders"), orderData);
+      return { id: docRef.id };
     },
     onSuccess: (data) => {
       setOrderNumber(`#${data.id}`);
       setIsSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({
         title: "Order placed successfully!",
         description: `Your order #${data.id} has been sent to the kitchen.`,

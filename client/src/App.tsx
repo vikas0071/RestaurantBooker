@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import OrderPage from "@/pages/order";
 import AdminPage from "@/pages/admin";
 import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import { UtensilsCrossed, QrCode, Settings } from "lucide-react";
 
 function Router() {
@@ -53,6 +54,7 @@ function Router() {
       )} />
       <Route path="/order" component={OrderPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
