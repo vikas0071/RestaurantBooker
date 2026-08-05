@@ -1,9 +1,7 @@
-// Firebase client initialization
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Replace with your Firebase project config
 const firebaseConfig = {
   apiKey: "AIzaSyCsk259ufToRr__aFCZwfPo6Q1dfxSzU6s",
   authDomain: "restaurantbooker-540f5.firebaseapp.com",
@@ -16,4 +14,5 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app); 

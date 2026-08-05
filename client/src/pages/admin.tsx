@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import OrderCard from "@/components/admin/order-card";
 import MenuManagement from "@/components/admin/menu-management";
@@ -15,13 +15,19 @@ import { useSocket } from "@/hooks/use-socket";
 import { useLocation } from "wouter";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("orders");
   const [user, setUser] = useState<any>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [editShopName, setEditShopName] = useState("");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -29,16 +35,36 @@ export default function AdminPage() {
         setUser(null);
         navigate("/login");
       } else {
-        // Always fetch latest admin info from Firestore
-        const adminDoc = await getDoc(doc(db, "admins", firebaseUser.uid));
-        if (adminDoc.exists()) {
+        // Read local storage first for immediate rendering
+        let nameFromLocal = "";
+        try {
+          const stored = localStorage.getItem("user");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.restaurantName) nameFromLocal = parsed.restaurantName;
+          }
+        } catch (e) {}
+
+        try {
+          const adminDoc = await getDoc(doc(db, "admins", firebaseUser.uid));
+          const rName = (adminDoc.exists() && adminDoc.data().restaurantName) || nameFromLocal || firebaseUser.displayName || "My Restaurant";
+          
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            restaurantName: adminDoc.data().restaurantName,
+            restaurantName: rName,
           });
-        } else {
-          setUser(null);
+          setEditShopName(rName);
+          localStorage.setItem("user", JSON.stringify({ uid: firebaseUser.uid, email: firebaseUser.email, restaurantName: rName }));
+        } catch (e) {
+          console.warn("Admin doc read notice:", e);
+          const rName = nameFromLocal || firebaseUser.displayName || "My Restaurant";
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            restaurantName: rName,
+          });
+          setEditShopName(rName);
         }
       }
     });
@@ -55,6 +81,9 @@ export default function AdminPage() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setIsLoading(false);
+    }, (error) => {
+      console.warn("Firestore orders snapshot notice:", error);
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, [user]);
@@ -65,12 +94,43 @@ export default function AdminPage() {
     navigate("/login");
   };
 
+  const handleSaveShopSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editShopName.trim() || !user?.uid) return;
+    setIsSavingSettings(true);
+    try {
+      await setDoc(doc(db, "admins", user.uid), {
+        restaurantName: editShopName.trim(),
+        email: user.email,
+        isSetupComplete: true,
+      }, { merge: true });
+
+      const updatedUser = { ...user, restaurantName: editShopName.trim() };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      toast({
+        title: "Shop Settings Saved!",
+        description: `Restaurant name updated to ${editShopName.trim()}.`,
+      });
+      setIsSettingsOpen(false);
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message || "Failed to update shop name.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading Dashboard...</p>
         </div>
       </div>
     );
@@ -98,22 +158,60 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-30">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-secondary">
-                {user.restaurantName || "Spice Garden"} Admin
-              </h1>
-              <p className="text-sm text-gray-600">Welcome back, {user.username}</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-accent bg-opacity-10 px-3 py-1 rounded-full">
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-accent">Live</span>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <UtensilsCrossed className="w-6 h-6 text-primary" />
               </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
+              <div>
+                <h1 className="text-2xl font-bold text-secondary">
+                  {user.restaurantName} <span className="text-primary text-sm font-semibold uppercase px-2 py-0.5 bg-primary/10 rounded-md ml-2">Admin</span>
+                </h1>
+                <p className="text-xs text-gray-500">{user.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-semibold text-emerald-700">Live Orders</span>
+              </div>
+
+              {/* Shop Settings Dialog */}
+              <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-1.5 border-gray-300">
+                    <Settings className="h-4 w-4" />
+                    <span>Shop Settings</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-bold">Edit Restaurant Shop Details</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSaveShopSettings} className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Restaurant / Shop Name</label>
+                      <Input
+                        value={editShopName}
+                        onChange={(e) => setEditShopName(e.target.value)}
+                        placeholder="e.g. Vikas Bistro"
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button type="button" variant="ghost" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
+                      <Button type="submit" disabled={isSavingSettings}>
+                        {isSavingSettings ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-gray-600 hover:text-red-600">
+                <LogOut className="h-4 w-4 mr-1" />
                 Logout
               </Button>
             </div>

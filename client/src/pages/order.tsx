@@ -13,19 +13,78 @@ import { UtensilsCrossed, Clock, IndianRupee, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface CartItem {
-  id: number;
+  id: string | number;
   name: string;
   price: number;
   quantity: number;
   notes?: string;
 }
 
+const SAMPLE_MENU: MenuItem[] = [
+  {
+    id: "sample-1",
+    name: "Paneer Butter Masala",
+    description: "Rich and creamy dish made with cottage cheese, butter, and tomato gravy.",
+    price: "320",
+    category: "mains",
+    preparationTime: 20,
+    isVegetarian: true,
+    isSpicy: false,
+    isAvailable: true,
+  },
+  {
+    id: "sample-2",
+    name: "Crispy Spring Rolls",
+    description: "Golden fried vegetable spring rolls served with sweet chili sauce.",
+    price: "180",
+    category: "appetizers",
+    preparationTime: 15,
+    isVegetarian: true,
+    isSpicy: false,
+    isAvailable: true,
+  },
+  {
+    id: "sample-3",
+    name: "Garlic Naan",
+    description: "Traditional Indian flatbread flavored with minced garlic and butter.",
+    price: "60",
+    category: "breads",
+    preparationTime: 10,
+    isVegetarian: true,
+    isSpicy: false,
+    isAvailable: true,
+  },
+  {
+    id: "sample-4",
+    name: "Mango Lassi",
+    description: "Refreshing yogurt-based drink blended with sweet mango pulp.",
+    price: "120",
+    category: "beverages",
+    preparationTime: 5,
+    isVegetarian: true,
+    isSpicy: false,
+    isAvailable: true,
+  },
+  {
+    id: "sample-5",
+    name: "Gulab Jamun",
+    description: "Soft milk-solid dumplings soaked in rose-flavored sugar syrup.",
+    price: "100",
+    category: "desserts",
+    preparationTime: 5,
+    isVegetarian: true,
+    isSpicy: false,
+    isAvailable: true,
+  }
+];
+
 export default function OrderPage() {
-  const [tableNumber, setTableNumber] = useState<number | null>(null);
+  const [tableNumber, setTableNumber] = useState<string | number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("appetizers");
 
+  const [shopName, setShopName] = useState<string>("Spice Garden");
   const [menuItems, setMenuItems] = useState<MenuItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [tableAdminId, setTableAdminId] = useState<string | null>(null);
@@ -35,39 +94,57 @@ export default function OrderPage() {
     async function fetchMenuAndAdmin() {
       setIsLoading(true);
       setTableError(null);
-      // Get table number from URL
       const params = new URLSearchParams(window.location.search);
-      const tableNumber = params.get("table");
-      if (!tableNumber) {
-        setTableError("No table number specified.");
+      const rawTable = params.get("table") || "1";
+      setTableNumber(rawTable);
+
+      try {
+        let adminId: string | null = null;
+        try {
+          const tableSnap = await getDoc(doc(db, "tables", rawTable));
+          if (tableSnap.exists()) {
+            adminId = tableSnap.data().adminId;
+            if (adminId) {
+              const adminSnap = await getDoc(doc(db, "admins", adminId));
+              if (adminSnap.exists() && adminSnap.data().restaurantName) {
+                setShopName(adminSnap.data().restaurantName);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Firestore table lookup notice:", e);
+        }
+
+        let items: MenuItem[] = [];
+        try {
+          let q;
+          if (adminId) {
+            q = query(collection(db, "menuItems"), where("adminId", "==", adminId));
+          } else {
+            q = collection(db, "menuItems");
+          }
+          const snapshot = await getDocs(q);
+          items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
+        } catch (e) {
+          console.warn("Firestore menu query notice:", e);
+        }
+
+        if (items.length === 0) {
+          items = SAMPLE_MENU;
+        }
+
+        setMenuItems(items);
+        const firstCat = items[0]?.category || "appetizers";
+        setActiveCategory(firstCat);
+      } catch (err: any) {
+        console.error("Error fetching menu:", err);
+        setMenuItems(SAMPLE_MENU);
+        setActiveCategory("appetizers");
+      } finally {
         setIsLoading(false);
-        return;
       }
-      // Fetch table info
-      const tableSnap = await getDoc(doc(db, "tables", tableNumber));
-      if (!tableSnap.exists()) {
-        setTableError("Table not found.");
-        setIsLoading(false);
-        return;
-      }
-      const tableData = tableSnap.data();
-      const adminId = tableData.adminId;
-      setTableAdminId(adminId);
-      // Fetch menu items for this admin
-      const q = query(collection(db, "menuItems"), where("adminId", "==", adminId));
-      const snapshot = await getDocs(q);
-      setMenuItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem)));
-      setIsLoading(false);
     }
     fetchMenuAndAdmin();
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const table = params.get("table");
-    if (table) {
-      setTableNumber(parseInt(table));
-    }
   }, []);
 
   const groupedMenu = menuItems?.reduce((acc, item) => {
@@ -99,7 +176,7 @@ export default function OrderPage() {
     });
   };
 
-  const updateCartItemQuantity = (id: number, quantity: number) => {
+  const updateCartItemQuantity = (id: string | number, quantity: number) => {
     if (quantity <= 0) {
       setCart(prev => prev.filter(item => item.id !== id));
     } else {
@@ -147,7 +224,7 @@ export default function OrderPage() {
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-secondary">Spice Garden</h1>
+              <h1 className="text-xl font-bold text-secondary">{shopName}</h1>
               <p className="text-sm text-gray-600">
                 Table <span className="font-medium text-primary">{tableNumber}</span>
               </p>
@@ -214,7 +291,7 @@ export default function OrderPage() {
                 {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}
               </h2>
               <div className="space-y-4">
-                {groupedMenu[activeCategory].map(item => (
+                {groupedMenu[activeCategory].map((item: MenuItem) => (
                   <MenuItemComponent
                     key={item.id}
                     item={item}

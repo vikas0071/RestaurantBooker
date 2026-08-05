@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, setDoc } from "firebase/firestore";
-// @ts-ignore
-import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +34,8 @@ export default function MenuManagement() {
     const q = query(collection(db, "tables"), where("adminId", "==", user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setTables(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.warn("Firestore tables listener notice:", error);
     });
     return () => unsubscribe();
   }, [user]);
@@ -46,6 +47,9 @@ export default function MenuManagement() {
     const q = query(collection(db, "menuItems"), where("adminId", "==", user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMenuItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem)));
+      setMenuLoading(false);
+    }, (error) => {
+      console.warn("Firestore menuItems listener notice:", error);
       setMenuLoading(false);
     });
     return () => unsubscribe();
@@ -72,6 +76,12 @@ export default function MenuManagement() {
       }
       setForm({});
       setEditingId(null);
+    } catch (err: any) {
+      toast({
+        title: "Action failed",
+        description: err.message || "Failed to save menu item. Check Firestore permissions.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -84,8 +94,16 @@ export default function MenuManagement() {
 
   const handleDeleteMenuItem = async (id: string) => {
     if (!window.confirm("Delete this menu item?")) return;
-    await deleteDoc(doc(db, "menuItems", id));
-    toast({ title: "Menu item deleted" });
+    try {
+      await deleteDoc(doc(db, "menuItems", id));
+      toast({ title: "Menu item deleted" });
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
+        description: err.message || "Failed to delete item.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Table QR code logic unchanged...
@@ -100,6 +118,13 @@ export default function MenuManagement() {
         createdAt: new Date().toISOString(),
       });
       setTableNumber("");
+      toast({ title: "Table added successfully" });
+    } catch (err: any) {
+      toast({
+        title: "Failed to add table",
+        description: err.message || "Check Firestore permissions.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -117,8 +142,16 @@ export default function MenuManagement() {
 
   const handleDeleteTable = async (tableId: string) => {
     if (!window.confirm("Delete this table and its QR code?")) return;
-    await deleteDoc(doc(db, "tables", tableId));
-    toast({ title: "Table deleted" });
+    try {
+      await deleteDoc(doc(db, "tables", tableId));
+      toast({ title: "Table deleted" });
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
+        description: err.message || "Failed to delete table.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!user) return null;
@@ -144,7 +177,7 @@ export default function MenuManagement() {
           {tables.map(table => (
             <div key={table.id} className="border rounded p-4 flex flex-col items-center">
               <div className="mb-2 font-medium">Table: {table.tableNumber}</div>
-              <QRCode
+              <QRCodeCanvas
                 id={`qr-${table.tableNumber}`}
                 value={`${window.location.origin}/order?table=${encodeURIComponent(table.tableNumber)}`}
                 size={128}
