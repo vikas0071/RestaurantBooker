@@ -1,7 +1,6 @@
 {
-  "version": 2,
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
-  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/(.*)",
