@@ -9,6 +9,7 @@ import AdminPage from "@/pages/admin";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import SetupShopPage from "@/pages/setup-shop";
+import SuperAdminPage from "@/pages/super-admin";
 import { UtensilsCrossed, QrCode, Settings } from "lucide-react";
 
 function Router() {
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/setup-shop" component={SetupShopPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/super-admin" component={SuperAdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -10,22 +10,26 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Settings, LogOut, ShoppingBag, UtensilsCrossed, Users, IndianRupee, Clock } from "lucide-react";
+import { Search, Settings, LogOut, ShoppingBag, UtensilsCrossed, Users, IndianRupee, Clock, Crown, ShieldCheck, Key, Sparkles } from "lucide-react";
 import { useSocket } from "@/hooks/use-socket";
 import { useLocation } from "wouter";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { isSuperAdminEmail, redeemLicenseKey } from "@/lib/subscription";
 
 export default function AdminPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("orders");
   const [user, setUser] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editShopName, setEditShopName] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [licenseInput, setLicenseInput] = useState("");
+  const [isRedeeming, setIsRedeeming] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
@@ -70,6 +74,32 @@ export default function AdminPage() {
     });
     return () => unsubscribe();
   }, [navigate]);
+
+  // Realtime subscription status listener
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = onSnapshot(doc(db, "admins", user.uid), (snap) => {
+      if (snap.exists()) {
+        setIsPremium(!!snap.data()?.isPremium);
+      }
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
+  const handleRedeemLicense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid || !licenseInput.trim()) return;
+    setIsRedeeming(true);
+    const res = await redeemLicenseKey(user.uid, licenseInput);
+    setIsRedeeming(false);
+    if (res.success) {
+      toast({ title: "🎉 Account Upgraded!", description: res.message });
+      setLicenseInput("");
+      setIsSettingsOpen(false);
+    } else {
+      toast({ title: "Invalid Key", description: res.message, variant: "destructive" });
+    }
+  };
 
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,37 +190,61 @@ export default function AdminPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-30">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
                 <UtensilsCrossed className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-secondary">
-                  {user.restaurantName} <span className="text-primary text-sm font-semibold uppercase px-2 py-0.5 bg-primary/10 rounded-md ml-2">Admin</span>
-                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-secondary">{user.restaurantName}</h1>
+                  {isPremium ? (
+                    <Badge className="bg-amber-500 text-white font-bold flex items-center gap-1">
+                      <Crown className="w-3.5 h-3.5" /> PRO PREMIUM
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-800 border-amber-400 bg-amber-50 font-semibold">
+                      FREE TIER
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+
+            <div className="flex items-center space-x-3 flex-wrap">
+              {/* Super Admin Access Button - ONLY visible to Super Admin email (e.g. vikasbishnoi@gmail.com) */}
+              {isSuperAdminEmail(user.email) && (
+                <Button
+                  size="sm"
+                  onClick={() => navigate("/super-admin")}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold flex items-center gap-1.5 shadow-md animate-in fade-in"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span>Super Admin Panel</span>
+                </Button>
+              )}
+
               <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                 <span className="text-xs font-semibold text-emerald-700">Live Orders</span>
               </div>
 
-              {/* Shop Settings Dialog */}
+              {/* Shop Settings & Activation Dialog */}
               <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="flex items-center gap-1.5 border-gray-300">
                     <Settings className="h-4 w-4" />
-                    <span>Shop Settings</span>
+                    <span>Settings & Plan</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
-                    <DialogTitle className="text-xl font-bold">Edit Restaurant Shop Details</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">Shop Details & Subscription Plan</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleSaveShopSettings} className="space-y-4 pt-2">
+                  
+                  {/* Shop Details Form */}
+                  <form onSubmit={handleSaveShopSettings} className="space-y-4 pt-2 border-b pb-4 border-gray-100">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700">Restaurant / Shop Name</label>
                       <Input
@@ -200,13 +254,58 @@ export default function AdminPage() {
                         required
                       />
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button type="button" variant="ghost" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
-                      <Button type="submit" disabled={isSavingSettings}>
-                        {isSavingSettings ? "Saving..." : "Save Changes"}
+                    <div className="flex justify-end gap-2">
+                      <Button type="submit" size="sm" disabled={isSavingSettings}>
+                        {isSavingSettings ? "Saving..." : "Update Shop Name"}
                       </Button>
                     </div>
                   </form>
+
+                  {/* Activation / License Key Form */}
+                  <div className="pt-2">
+                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5 mb-2">
+                      <Key className="w-4 h-4 text-amber-600" /> Activate PRO / Premium Plan
+                    </h4>
+                    {isPremium ? (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                        Your shop is currently active on the PRO Premium Plan!
+                      </div>
+                    ) : (
+                      <form onSubmit={handleRedeemLicense} className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter License Key (e.g. PRO-2026-VIP)"
+                            value={licenseInput}
+                            onChange={(e) => setLicenseInput(e.target.value)}
+                            className="font-mono text-sm uppercase"
+                            required
+                          />
+                          <Button type="submit" size="sm" disabled={isRedeeming} className="bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0">
+                            {isRedeeming ? "Verifying..." : "Redeem Key"}
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          Try demo code: <code className="font-bold text-amber-700">PRO-2026-VIP</code> or contact owner for access key.
+                        </p>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* Quick Access to Super Admin ONLY for Platform Owner email */}
+                  {isSuperAdminEmail(user.email) && (
+                    <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                      <span>Platform Owner Portal</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setIsSettingsOpen(false); navigate("/super-admin"); }}
+                        className="text-amber-800 border-amber-300 bg-amber-50 hover:bg-amber-100 font-bold"
+                      >
+                        <Crown className="w-3.5 h-3.5 mr-1 text-amber-600" /> Open Super Admin Panel
+                      </Button>
+                    </div>
+                  )}
                 </DialogContent>
               </Dialog>
 

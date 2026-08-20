@@ -3,7 +3,12 @@ import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, setDoc } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { redeemLicenseKey } from "@/lib/subscription";
+import { Crown, Sparkles, Lock, Key, AlertCircle } from "lucide-react";
 
 interface MenuItem {
   id: string;
@@ -25,10 +30,28 @@ export default function MenuManagement() {
   const [menuLoading, setMenuLoading] = useState(true);
   const [form, setForm] = useState<Partial<MenuItem>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Premium / Subscription State
+  const [isPremium, setIsPremium] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [licenseInput, setLicenseInput] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+
   const user = auth.currentUser;
   const { toast } = useToast();
 
-  // Table management (already Firestore)
+  // Listen to Admin profile for real-time Premium status
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = onSnapshot(doc(db, "admins", user.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        setIsPremium(!!snapshot.data()?.isPremium);
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Table management (Firestore)
   useEffect(() => {
     if (!user?.uid) return;
     const q = query(collection(db, "tables"), where("adminId", "==", user.uid));
@@ -61,6 +84,13 @@ export default function MenuManagement() {
       toast({ title: "All fields required", description: "Name, price, and category are required.", variant: "destructive" });
       return;
     }
+
+    // Check Free Plan limit (Max 5 items for free tier)
+    if (!editingId && !isPremium && menuItems.length >= 5) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     setLoading(true);
     try {
       if (editingId) {
@@ -72,7 +102,7 @@ export default function MenuManagement() {
           adminId: user?.uid,
           createdAt: new Date().toISOString(),
         });
-        toast({ title: "Menu item added" });
+        toast({ title: "Menu item added successfully!" });
       }
       setForm({});
       setEditingId(null);
@@ -84,6 +114,21 @@ export default function MenuManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRedeemKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid) return;
+    setRedeeming(true);
+    const res = await redeemLicenseKey(user.uid, licenseInput);
+    setRedeeming(false);
+    if (res.success) {
+      toast({ title: "🎉 Upgrade Successful!", description: res.message });
+      setShowUpgradeModal(false);
+      setLicenseInput("");
+    } else {
+      toast({ title: "Redemption Failed", description: res.message, variant: "destructive" });
     }
   };
 
@@ -106,10 +151,16 @@ export default function MenuManagement() {
     }
   };
 
-  // Table QR code logic unchanged...
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tableNumber) return;
+
+    // Check Free Plan limit (Max 5 tables for free tier)
+    if (!isPremium && tables.length >= 5) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     setLoading(true);
     try {
       await setDoc(doc(db, "tables", tableNumber), {
@@ -157,48 +208,98 @@ export default function MenuManagement() {
   if (!user) return null;
   return (
     <div className="space-y-8">
-      {/* Table Management */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Table Management</h2>
-        <form onSubmit={handleAddTable} className="flex space-x-2 mb-4">
+      {/* Table Management Section */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Table & QR Code Management</h2>
+            <p className="text-xs text-gray-500">Generate QR codes for your restaurant tables.</p>
+          </div>
+          <Badge variant="outline" className={`text-xs ${isPremium ? "border-emerald-400 bg-emerald-50 text-emerald-800" : "border-amber-400 bg-amber-50 text-amber-800"}`}>
+            {isPremium ? `UNLIMITED PRO (${tables.length} Tables)` : `Free Limit: 5 Tables (Used: ${tables.length})`}
+          </Badge>
+        </div>
+
+        <form onSubmit={handleAddTable} className="flex space-x-2 mb-6">
           <input
             type="text"
-            placeholder="Table Number or Name"
+            placeholder="Table Number or Name (e.g. 5, 12, VIP)"
             value={tableNumber}
             onChange={e => setTableNumber(e.target.value)}
-            className="border rounded px-3 py-2"
+            className="border rounded px-3 py-2 text-sm border-gray-300 focus:border-primary"
             disabled={loading}
           />
           <Button type="submit" disabled={loading || !tableNumber}>
             {loading ? "Adding..." : "Add Table"}
           </Button>
         </form>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tables.map(table => (
-            <div key={table.id} className="border rounded p-4 flex flex-col items-center">
-              <div className="mb-2 font-medium">Table: {table.tableNumber}</div>
+            <div key={table.id} className="border border-gray-200 bg-gray-50/50 rounded-xl p-4 flex flex-col items-center shadow-xs">
+              <div className="mb-2 font-bold text-gray-900">Table: {table.tableNumber}</div>
               <QRCodeCanvas
                 id={`qr-${table.tableNumber}`}
                 value={`${window.location.origin}/order?table=${encodeURIComponent(table.tableNumber)}`}
                 size={128}
                 level="H"
                 includeMargin
+                className="bg-white p-1 rounded-lg border border-gray-200"
               />
-              <div className="flex gap-2 mt-2">
-                <Button onClick={() => handleDownloadQR(table.tableNumber)}>
+              <div className="flex gap-2 mt-3 w-full">
+                <Button size="sm" onClick={() => handleDownloadQR(table.tableNumber)} className="flex-1 text-xs">
                   Download QR
                 </Button>
-                <Button variant="destructive" onClick={() => handleDeleteTable(table.id)}>
+                <Button size="sm" variant="destructive" onClick={() => handleDeleteTable(table.id)} className="text-xs">
                   Delete Table
                 </Button>
               </div>
             </div>
           ))}
+
+          {tables.length === 0 && (
+            <div className="col-span-full text-center py-8 text-gray-500 text-sm">
+              No tables added yet. Enter a table number above to generate your first QR code!
+            </div>
+          )}
         </div>
       </div>
-      {/* Menu Management */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Menu Management</h2>
+
+      {/* Menu Management Section */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
+        {/* Free Plan Banner specifically for Menu Items */}
+        {!isPremium && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-background border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-700 shrink-0">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-amber-900 text-sm flex items-center gap-2">
+                  Free Tier Plan ({menuItems.length}/5 Menu Items used)
+                </p>
+                <p className="text-xs text-amber-800">
+                  Upgrade to PRO to add unlimited menu items, dishes, and categories!
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowUpgradeModal(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0 shadow-md"
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" /> Unlock PRO Access
+            </Button>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900">Menu Management</h2>
+          <Badge variant="outline" className={`text-xs ${isPremium ? "border-emerald-400 bg-emerald-50 text-emerald-800" : "border-amber-400 bg-amber-50 text-amber-800"}`}>
+            {isPremium ? `UNLIMITED PRO (${menuItems.length} Items)` : `Free Limit: 5 Items (Used: ${menuItems.length})`}
+          </Badge>
+        </div>
+
         <form onSubmit={handleAddOrEditMenuItem} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <input
             type="text"
@@ -271,6 +372,7 @@ export default function MenuManagement() {
             </Button>
           )}
         </form>
+
         {menuLoading ? (
           <div>Loading menu...</div>
         ) : (
@@ -293,6 +395,47 @@ export default function MenuManagement() {
           </div>
         )}
       </div>
+
+      {/* Upgrade to PRO Modal */}
+      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-3 w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-600">
+              <Crown className="w-8 h-8" />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-gray-900">Unlock PRO / Premium Features</DialogTitle>
+            <DialogDescription className="text-gray-600 text-sm mt-1">
+              You have reached the Free Tier limit (5 Tables / 5 Menu Items). Enter your License Key below to upgrade to Unlimited PRO Access!
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleRedeemKey} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <Key className="w-4 h-4 text-amber-600" /> Enter Activation / License Key
+              </label>
+              <Input
+                placeholder="e.g. PRO-2026-VIP"
+                value={licenseInput}
+                onChange={(e) => setLicenseInput(e.target.value)}
+                className="font-mono text-base uppercase border-amber-300 focus:border-amber-500 h-12"
+                required
+              />
+              <p className="text-xs text-gray-500">
+                Don't have a key? Contact the owner/admin or try demo key: <code className="font-bold text-amber-700">PRO-2026-VIP</code>
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={redeeming}
+              className="w-full h-12 bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg"
+            >
+              {redeeming ? "Activating..." : "Activate PRO Plan Now"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
