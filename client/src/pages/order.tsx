@@ -104,6 +104,7 @@ export default function OrderPage() {
           const tableSnap = await getDoc(doc(db, "tables", rawTable));
           if (tableSnap.exists()) {
             adminId = tableSnap.data().adminId;
+            setTableAdminId(adminId);
             if (adminId) {
               const adminSnap = await getDoc(doc(db, "admins", adminId));
               if (adminSnap.exists() && adminSnap.data().restaurantName) {
@@ -320,6 +321,7 @@ export default function OrderPage() {
         cart={cart}
         onUpdateQuantity={updateCartItemQuantity}
         tableNumber={tableNumber}
+        adminId={tableAdminId}
       />
 
       {/* Progress Bar for Menu Loading */}

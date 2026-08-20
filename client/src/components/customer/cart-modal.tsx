@@ -25,9 +25,10 @@ interface CartModalProps {
   cart: CartItem[];
   onUpdateQuantity: (id: string | number, quantity: number) => void;
   tableNumber: string | number | null;
+  adminId?: string | null;
 }
 
-export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tableNumber }: CartModalProps) {
+export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tableNumber, adminId }: CartModalProps) {
   const [notes, setNotes] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
@@ -65,6 +66,7 @@ export default function CartModal({ isOpen, onClose, cart, onUpdateQuantity, tab
 
   const handlePlaceOrder = () => {
     const orderData = {
+      adminId: adminId || null,
       tableId: tableNumber || "1",
       items: cart.map(item => ({
         id: item.id,
