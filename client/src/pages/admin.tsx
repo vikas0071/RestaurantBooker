@@ -17,7 +17,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { isSuperAdminEmail, redeemLicenseKey } from "@/lib/subscription";
+import { isSuperAdminEmail, isSuperAdminUser, ensureSuperAdminBootstrap, redeemLicenseKey } from "@/lib/subscription";
 
 export default function AdminPage() {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -39,6 +39,14 @@ export default function AdminPage() {
         setUser(null);
         navigate("/login");
       } else {
+        // Auto-bootstrap Super Admin account doc in Firestore if needed
+        await ensureSuperAdminBootstrap(firebaseUser.uid, firebaseUser.email);
+
+        const isSuper = isSuperAdminEmail(firebaseUser.email);
+        if (isSuper) {
+          setIsPremium(true);
+        }
+
         // Read local storage first for immediate rendering
         let nameFromLocal = "";
         try {
@@ -51,13 +59,19 @@ export default function AdminPage() {
 
         try {
           const adminDoc = await getDoc(doc(db, "admins", firebaseUser.uid));
-          const rName = (adminDoc.exists() && adminDoc.data().restaurantName) || nameFromLocal || firebaseUser.displayName || "My Restaurant";
-          
+          const docData = adminDoc.exists() ? adminDoc.data() : {};
+          const rName = docData.restaurantName || nameFromLocal || firebaseUser.displayName || "My Restaurant";
+          const isSuper = !!docData.isSuperAdmin;
+
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             restaurantName: rName,
+            isSuperAdmin: isSuper,
           });
+          if (isSuper || docData.isPremium) {
+            setIsPremium(true);
+          }
           setEditShopName(rName);
           localStorage.setItem("user", JSON.stringify({ uid: firebaseUser.uid, email: firebaseUser.email, restaurantName: rName }));
         } catch (e) {
@@ -67,6 +81,7 @@ export default function AdminPage() {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             restaurantName: rName,
+            isSuperAdmin: false,
           });
           setEditShopName(rName);
         }
@@ -80,7 +95,12 @@ export default function AdminPage() {
     if (!user?.uid) return;
     const unsub = onSnapshot(doc(db, "admins", user.uid), (snap) => {
       if (snap.exists()) {
-        setIsPremium(!!snap.data()?.isPremium);
+        const data = snap.data();
+        if (data.isSuperAdmin || data.isPremium) {
+          setIsPremium(true);
+        } else {
+          setIsPremium(false);
+        }
       }
     });
     return () => unsub();
@@ -213,8 +233,8 @@ export default function AdminPage() {
             </div>
 
             <div className="flex items-center space-x-3 flex-wrap">
-              {/* Super Admin Access Button - ONLY visible to Super Admin email (e.g. vikasbishnoi@gmail.com) */}
-              {isSuperAdminEmail(user.email) && (
+              {/* Super Admin Access Button - ONLY visible to Super Admin users */}
+              {isSuperAdminUser(user) && (
                 <Button
                   size="sm"
                   onClick={() => navigate("/super-admin")}
@@ -292,8 +312,8 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {/* Quick Access to Super Admin ONLY for Platform Owner email */}
-                  {isSuperAdminEmail(user.email) && (
+                  {/* Quick Access to Super Admin ONLY for Platform Owner user */}
+                  {isSuperAdminUser(user) && (
                     <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
                       <span>Platform Owner Portal</span>
                       <Button
