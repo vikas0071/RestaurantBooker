@@ -9,8 +9,12 @@ export const BUILTIN_KEYS: Record<string, string> = {
   "VIP-SHOP-2026": "Standard Commercial License",
 };
 
-// Super admin email list (Can be dynamically configured or populated)
-export const SUPER_ADMIN_EMAILS: string[] = [];
+// Super admin email list (Only these specific emails have automatic Super Admin access)
+export const SUPER_ADMIN_EMAILS = [
+  "admin@restaurantbooker.com",
+  "vikas@restaurantbooker.com",
+  "vikasbishnoi@gmail.com",
+];
 
 // Master Passcode for Super Admin Access (Change this PIN whenever you want)
 export let SUPER_ADMIN_MASTER_PIN = "SUPER2026";
@@ -55,7 +59,9 @@ export function isSuperAdminEmail(email?: string | null): boolean {
 export function isSuperAdminUser(userObj?: any): boolean {
   if (!userObj) return false;
   if (userObj.isSuperAdmin === true) return true;
-  return isSuperAdminEmail(userObj.email || (typeof userObj === "string" ? userObj : null));
+  if (typeof window !== "undefined" && sessionStorage.getItem("super_admin_pin_unlocked") === "true") return true;
+  const email = typeof userObj === "string" ? userObj : userObj.email;
+  return isSuperAdminEmail(email);
 }
 
 export async function ensureSuperAdminBootstrap(uid: string, email?: string | null) {
